@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	kubeconfig = flag.String("kubeconfig", "", "kubeconfig")
+	kubeconfig = flag.String("kubeconfig", "", "path to kubeconfig file")
+	insecure   = flag.Bool("insecure", false, "insecure connection to kubernetes API")
 	clientset  *kubernetes.Clientset
 	restconfig *rest.Config
 )
@@ -30,6 +31,10 @@ func Init() error {
 		if err != nil {
 			return errors.Wrap(err, "error in rest.InClusterConfig")
 		}
+	}
+
+	if *insecure {
+		restconfig.Insecure = true
 	}
 
 	clientset, err = kubernetes.NewForConfig(restconfig)
