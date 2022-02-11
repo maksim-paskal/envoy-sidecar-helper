@@ -1,6 +1,7 @@
 KUBECONFIG=$(HOME)/.kube/dev
 
 test:
+	./scripts/validate-license.sh
 	go mod tidy
 	go fmt ./cmd/... ./pkg/...
 	go vet ./cmd/... ./pkg/...
