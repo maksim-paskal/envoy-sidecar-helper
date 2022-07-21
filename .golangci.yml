@@ -10,3 +10,4 @@ linters:
   - exhaustivestruct
   - varnamelen
   - gomnd
+  - exhaustruct
