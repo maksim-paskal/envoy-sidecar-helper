@@ -51,6 +51,8 @@ containers:
   image: paskalmaksim/envoy-sidecar-helper:latest
   imagePullPolicy: Always
   args:
+  - -envoy.ready.check=true
+  - -envoy.endpoint.ready=/ready
   - -envoy.port=9901
   env:
   - name: POD_NAME

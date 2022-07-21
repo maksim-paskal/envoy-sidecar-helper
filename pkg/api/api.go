@@ -28,32 +28,44 @@ import (
 )
 
 var (
-	envoyHost      = flag.String("envoy.host", "http://127.0.0.1", "envoy host")
-	envoyPort      = flag.Int("envoy.port", 18000, "envoy port")
-	podName        = flag.String("pod", os.Getenv("POD_NAME"), "pod name")
-	namespace      = flag.String("namespace", os.Getenv("POD_NAMESPACE"), "namespace")
-	containersName = flag.String("container", "", "containers to watch, may be splited by comma")
-	envoyReadyFile = flag.String("envoy.readyFile", "/envoy-sidecar-helper/envoy.ready", "")
+	envoyHost          = flag.String("envoy.host", "http://127.0.0.1", "envoy host")
+	envoyPort          = flag.Int("envoy.port", 18000, "envoy port")
+	podName            = flag.String("pod", os.Getenv("POD_NAME"), "pod name")
+	namespace          = flag.String("namespace", os.Getenv("POD_NAMESPACE"), "namespace")
+	containersName     = flag.String("container", "", "container or containers to watch (splited with comma)")
+	envoyReadyCheck    = flag.Bool("envoy.ready.check", true, "check envoy is ready")
+	envoyReadyFile     = flag.String("envoy.ready.file", "/envoy-sidecar-helper/envoy.ready", "")
+	envoyReadyEndpoint = flag.String("envoy.endpoint.ready", "/ready", "endpoint to check envoy is ready")
+	envoyQuitEndpoint  = flag.String("envoy.endpoint.quit", "/quitquitquit", "endpoint to quit envoy")
+	checkDuration      = flag.Duration("check.duration", time.Second, "duration to check if container is stopped")
+	httpTimeout        = flag.Duration("http.timeout", time.Second*5, "http timeout")
 )
 
 var httpClient = &http.Client{
-	Timeout: 5 * time.Second,
+	Timeout: *httpTimeout,
 }
 
 var ctx = context.Background()
 
 var (
-	errContainerNotFound = errors.New("container not found")
-	errStatusNotOK       = errors.New("envoy return not OK status")
+	errContainerStillRunning = errors.New("containers still running")
+	errStatusNotOK           = errors.New("envoy return not OK status")
 )
 
+// wait for envoy sidecar to be ready.
 func CheckEnvoyStart() {
+	if !*envoyReadyCheck {
+		log.Info("envoy ready check disabled")
+
+		return
+	}
+
 	log.Infof("waiting for envoy will be ready %s:%d", *envoyHost, *envoyPort)
 
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(*checkDuration)
 
-		if err := makeCall("GET", "/ready"); err != nil {
+		if err := makeCall("GET", *envoyReadyEndpoint); err != nil {
 			log.WithError(err).Debug()
 		} else {
 			break
@@ -67,6 +79,7 @@ func CheckEnvoyStart() {
 	}
 }
 
+// check if container is stoped.
 func IsContainerStoped() (bool, error) {
 	pod, err := client.KubeClient().CoreV1().Pods(*namespace).Get(ctx, *podName, metav1.GetOptions{})
 	if err != nil {
@@ -76,6 +89,7 @@ func IsContainerStoped() (bool, error) {
 	// use first container if not specified
 	podContainersName := []string{pod.Spec.Containers[0].Name}
 
+	// if container name is specified, use it
 	if len(*containersName) > 0 {
 		podContainersName = strings.Split(*containersName, ",")
 	}
@@ -84,6 +98,7 @@ func IsContainerStoped() (bool, error) {
 
 	foundContainers := 0
 
+	// check if containers is stopped
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		for _, podContainerName := range podContainersName {
 			if containerStatus.Name == podContainerName {
@@ -96,18 +111,23 @@ func IsContainerStoped() (bool, error) {
 
 	log.Debugf("foundContainers=%d,allPodContainers=%d", foundContainers, len(podContainersName))
 
+	// if all watched containers are stopped, return true
 	if foundContainers == len(podContainersName) {
 		return true, nil
 	}
 
-	return false, errContainerNotFound
+	containersName := strings.Join(podContainersName, ",")
+
+	// if not all watched containers are stopped, return false
+	return false, errors.Wrap(errContainerStillRunning, containersName)
 }
 
+// check is watched containers is stopped.
 func CheckContainerStop() {
 	log.Info("waiting for container stop")
 
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(*checkDuration)
 
 		stoped, err := IsContainerStoped()
 		if err != nil {
@@ -119,11 +139,12 @@ func CheckContainerStop() {
 		}
 	}
 
-	if err := makeCall("POST", "/quitquitquit"); err != nil {
+	if err := makeCall("POST", *envoyQuitEndpoint); err != nil {
 		log.WithError(err).Error()
 	}
 }
 
+// make http call to envoy sidecar.
 func makeCall(method string, path string) error {
 	ctx := context.Background()
 
@@ -144,7 +165,7 @@ func makeCall(method string, path string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return errStatusNotOK
+		return errors.Wrap(errStatusNotOK, "response status not OK")
 	}
 
 	return nil
