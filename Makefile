@@ -12,10 +12,8 @@ run:
 	-kubeconfig=$(KUBECONFIG)
 build:
 	go run github.com/goreleaser/goreleaser@latest build --rm-dist --snapshot
-	mv ./dist/envoy-sidecar-helper_linux_amd64/envoy-sidecar-helper envoy-sidecar-helper
-	docker build --pull . -t paskalmaksim/envoy-sidecar-helper:dev
-push:
-	docker push paskalmaksim/envoy-sidecar-helper:dev
+	mv ./dist/envoy-sidecar-helper_linux_amd64_v1/envoy-sidecar-helper envoy-sidecar-helper
+	docker build --pull --push . -t paskalmaksim/envoy-sidecar-helper:dev
 deploy:
 	make clean || true
 	kubectl apply -f ./examples

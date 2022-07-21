@@ -53,6 +53,8 @@ spec:
         args:
         - -log.level=DEBUG
         - -container=main1,main2
+        - -envoy.ready.check=true
+        - -envoy.endpoint.ready=/ready
         - -envoy.port=9901
         env:
         - name: POD_NAME

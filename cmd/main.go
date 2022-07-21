@@ -23,9 +23,9 @@ import (
 var gitVersion = "dev"
 
 var (
-	logLevel        = flag.String("log.level", "INFO", "")
-	logPretty       = flag.Bool("log.pretty", false, "")
-	logReportCaller = flag.Bool("log.reportCaller", true, "")
+	logLevel        = flag.String("log.level", "INFO", "log level (DEBUG, INFO, WARN, ERROR, FATAL, PANIC)")
+	logPretty       = flag.Bool("log.pretty", false, "logs in text format")
+	logReportCaller = flag.Bool("log.reportCaller", true, "log line number and file name")
 )
 
 func main() {
