@@ -48,8 +48,7 @@ spec:
         imagePullPolicy: Always
       # helpers
       - name: envoy-sidecar-helper
-        image: paskalmaksim/envoy-sidecar-helper:dev
-        imagePullPolicy: Always
+{{ include "envoy-sidecar-helper.image" (index .Values "envoy-sidecar-helper") | indent 8 }}
         args:
         - -log.level=DEBUG
         - -container=main1,main2

@@ -1,2 +1,3 @@
 /dist
 /envoy-sidecar-helper
+/examples/envoy-sidecar-helper-test/charts
