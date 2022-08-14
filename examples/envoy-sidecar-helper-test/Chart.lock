@@ -1,0 +1,6 @@
+dependencies:
+- name: envoy-sidecar-helper
+  repository: file://../../charts/envoy-sidecar-helper
+  version: 0.0.1
+digest: sha256:fda698e3a4df026b4738511cddc5340b2e22dcdaa37abb7c8bfb1954fdfe1f55
+generated: "2022-08-14T15:55:03.486904+03:00"

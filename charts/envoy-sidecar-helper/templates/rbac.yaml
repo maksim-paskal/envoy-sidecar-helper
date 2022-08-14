@@ -2,11 +2,19 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: envoy-sidecar-helper
+{{ if .Values.rbac.annotations }}
+  annotations:
+{{ toYaml .Values.rbac.annotations | indent 4 }}
+{{ end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: envoy-sidecar-helper-role
+{{ if .Values.rbac.annotations }}
+  annotations:
+{{ toYaml .Values.rbac.annotations | indent 4 }}
+{{ end }}
 rules:
 - apiGroups: [""]
   resources: ["pods"]
@@ -16,6 +24,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: envoy-sidecar-helper
+{{ if .Values.rbac.annotations }}
+  annotations:
+{{ toYaml .Values.rbac.annotations | indent 4 }}
+{{ end }}
 roleRef:
   kind: Role
   name: envoy-sidecar-helper-role
@@ -23,4 +35,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: envoy-sidecar-helper
-  namespace: default
+  namespace: {{ .Release.Namespace }}

@@ -1,0 +1,12 @@
+apiVersion: v2
+icon: https://helm.sh/img/helm.svg
+name: envoy-sidecar-helper-test
+version: 0.0.1
+description: sidecar helpers for envoy
+maintainers:
+- name: maksim-paskal  # Maksim Paskal
+  email: paskal.maksim@gmail.com
+dependencies:
+- name: envoy-sidecar-helper
+  version: "*"
+  repository: "file://../../charts/envoy-sidecar-helper"
