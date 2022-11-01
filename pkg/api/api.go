@@ -30,6 +30,7 @@ import (
 var (
 	envoyHost          = flag.String("envoy.host", "http://127.0.0.1", "envoy host")
 	envoyPort          = flag.Int("envoy.port", 18000, "envoy port")
+	exitZero           = flag.Bool("exit.zero", false, "watch containers for zero exit status code")
 	podName            = flag.String("pod", os.Getenv("POD_NAME"), "pod name")
 	namespace          = flag.String("namespace", os.Getenv("POD_NAMESPACE"), "namespace")
 	containersName     = flag.String("container", "", "container or containers to watch (splited with comma)")
@@ -102,8 +103,15 @@ func IsContainerStoped() (bool, error) {
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		for _, podContainerName := range podContainersName {
 			if containerStatus.Name == podContainerName {
-				if containerStatus.State.Terminated != nil {
-					foundContainers++
+				if term := containerStatus.State.Terminated; term != nil {
+					switch {
+					case *exitZero:
+						if term.ExitCode == 0 {
+							foundContainers++
+						}
+					default:
+						foundContainers++
+					}
 				}
 			}
 		}
