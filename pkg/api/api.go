@@ -24,12 +24,14 @@ import (
 	"github.com/maksim-paskal/envoy-sidecar-helper/pkg/client"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
 	envoyHost          = flag.String("envoy.host", "http://127.0.0.1", "envoy host")
 	envoyPort          = flag.Int("envoy.port", 18000, "envoy port")
+	exitZero           = flag.Bool("exit.zero", false, "watch containers for zero exit status code")
 	podName            = flag.String("pod", os.Getenv("POD_NAME"), "pod name")
 	namespace          = flag.String("namespace", os.Getenv("POD_NAMESPACE"), "namespace")
 	containersName     = flag.String("container", "", "container or containers to watch (splited with comma)")
@@ -96,15 +98,20 @@ func IsContainerStoped() (bool, error) {
 
 	log.Debugf("containers to watch %v", podContainersName)
 
+	states := getTermStates(podContainersName, pod)
+
 	foundContainers := 0
 
-	// check if containers is stopped
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		for _, podContainerName := range podContainersName {
-			if containerStatus.Name == podContainerName {
-				if containerStatus.State.Terminated != nil {
+	// check if containers are stopped
+	for _, term := range states {
+		if term != nil {
+			switch {
+			case *exitZero:
+				if term.ExitCode == 0 {
 					foundContainers++
 				}
+			default:
+				foundContainers++
 			}
 		}
 	}
@@ -120,6 +127,26 @@ func IsContainerStoped() (bool, error) {
 
 	// if not all watched containers are stopped, return false
 	return false, errors.Wrap(errContainerStillRunning, containersName)
+}
+
+type termStates map[string]*v1.ContainerStateTerminated
+
+// getTermStates will get container termination states for provided names.
+func getTermStates(names []string, pod *v1.Pod) termStates {
+	states := termStates{}
+
+	for _, podContainerName := range names {
+		states[podContainerName] = nil
+	}
+
+	// get only the states for containers listed
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if _, ok := states[containerStatus.Name]; ok {
+			states[containerStatus.Name] = containerStatus.State.Terminated
+		}
+	}
+
+	return states
 }
 
 // check is watched containers is stopped.
