@@ -14,6 +14,7 @@ run:
 	-log.pretty \
 	-kubeconfig=$(KUBECONFIG)
 build:
+	git tag -d `git tag -l "envoy-sidecar-helper-*"`
 	go run github.com/goreleaser/goreleaser@latest build --rm-dist --snapshot
 	mv ./dist/envoy-sidecar-helper_linux_amd64_v1/envoy-sidecar-helper envoy-sidecar-helper
 	docker build --pull --push . -t paskalmaksim/envoy-sidecar-helper:$(tag)
