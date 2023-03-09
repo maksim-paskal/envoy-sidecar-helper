@@ -30,14 +30,15 @@ import (
 
 var (
 	envoyHost          = flag.String("envoy.host", "http://127.0.0.1", "envoy host")
-	envoyPort          = flag.Int("envoy.port", 18000, "envoy port")
+	envoyPort          = flag.Int("envoy.port", 15020, "envoy port")
 	exitZero           = flag.Bool("exit.zero", false, "watch containers for zero exit status code")
 	podName            = flag.String("pod", os.Getenv("POD_NAME"), "pod name")
 	namespace          = flag.String("namespace", os.Getenv("POD_NAMESPACE"), "namespace")
 	containersName     = flag.String("container", "", "container or containers to watch (splited with comma)")
+	envoyReadyPort     = flag.Int("envoy.ready.port", 15021, "health port")
 	envoyReadyCheck    = flag.Bool("envoy.ready.check", true, "check envoy is ready")
 	envoyReadyFile     = flag.String("envoy.ready.file", "/envoy-sidecar-helper/envoy.ready", "")
-	envoyReadyEndpoint = flag.String("envoy.endpoint.ready", "/ready", "endpoint to check envoy is ready")
+	envoyReadyEndpoint = flag.String("envoy.endpoint.ready", "/healthz/ready", "endpoint to check envoy is ready")
 	envoyQuitEndpoint  = flag.String("envoy.endpoint.quit", "/quitquitquit", "endpoint to quit envoy")
 	checkDuration      = flag.Duration("check.duration", time.Second, "duration to check if container is stopped")
 	httpTimeout        = flag.Duration("http.timeout", time.Second*5, "http timeout")
@@ -51,23 +52,21 @@ var ctx = context.Background()
 
 var (
 	errContainerStillRunning = errors.New("containers still running")
-	errStatusNotOK           = errors.New("envoy return not OK status")
 )
 
 // wait for envoy sidecar to be ready.
 func CheckEnvoyStart() {
 	if !*envoyReadyCheck {
 		log.Info("envoy ready check disabled")
-
 		return
 	}
 
-	log.Infof("waiting for envoy will be ready %s:%d", *envoyHost, *envoyPort)
+	log.Infof("waiting for envoy will be ready %s:%d%s", *envoyHost, *envoyReadyPort, *envoyReadyEndpoint)
 
 	for {
 		time.Sleep(*checkDuration)
 
-		if err := makeCall("GET", *envoyReadyEndpoint); err != nil {
+		if err := makeCall("GET", *envoyHost, *envoyReadyPort, *envoyReadyEndpoint); err != nil {
 			log.WithError(err).Debug()
 		} else {
 			break
@@ -166,16 +165,16 @@ func CheckContainerStop() {
 		}
 	}
 
-	if err := makeCall("POST", *envoyQuitEndpoint); err != nil {
+	if err := makeCall("POST", *envoyHost, *envoyPort, *envoyQuitEndpoint); err != nil {
 		log.WithError(err).Error()
 	}
 }
 
 // make http call to envoy sidecar.
-func makeCall(method string, path string) error {
+func makeCall(method string, host string, port int, path string) error {
 	ctx := context.Background()
 
-	url := fmt.Sprintf("%s:%d%s", *envoyHost, *envoyPort, path)
+	url := fmt.Sprintf("%s:%d%s", host, port, path)
 
 	log.Debugf("create request %s, %s", method, url)
 
@@ -192,7 +191,8 @@ func makeCall(method string, path string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrap(errStatusNotOK, "response status not OK")
+		err := fmt.Errorf("unexpected response code: %d", resp.StatusCode)
+		return errors.Wrap(err, "response status not OK")
 	}
 
 	return nil
