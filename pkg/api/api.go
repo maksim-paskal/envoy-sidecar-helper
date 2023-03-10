@@ -50,14 +50,13 @@ var httpClient = &http.Client{
 
 var ctx = context.Background()
 
-var (
-	errContainerStillRunning = errors.New("containers still running")
-)
+var errContainerStillRunning = errors.New("containers still running")
 
 // wait for envoy sidecar to be ready.
 func CheckEnvoyStart() {
 	if !*envoyReadyCheck {
 		log.Info("envoy ready check disabled")
+
 		return
 	}
 
@@ -191,7 +190,8 @@ func makeCall(method string, host string, port int, path string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("unexpected response code: %d", resp.StatusCode)
+		err := fmt.Errorf("unexpected response code: %d", resp.StatusCode) //nolint:goerr113
+
 		return errors.Wrap(err, "response status not OK")
 	}
 
