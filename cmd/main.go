@@ -13,7 +13,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/maksim-paskal/envoy-sidecar-helper/pkg/api"
 	"github.com/maksim-paskal/envoy-sidecar-helper/pkg/client"
@@ -54,9 +58,24 @@ func main() {
 		log.WithError(err).Fatal()
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	signalChanInterrupt := make(chan os.Signal, 1)
+	signal.Notify(signalChanInterrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-signalChanInterrupt
+		log.Error("Got interruption signal...")
+		cancel()
+
+		<-signalChanInterrupt
+		os.Exit(1)
+	}()
+
 	// wait for envoy start
-	api.CheckEnvoyStart()
+	api.CheckEnvoyStart(ctx)
 
 	// check container status
-	api.CheckContainerStop()
+	api.CheckContainerStop(ctx)
 }
