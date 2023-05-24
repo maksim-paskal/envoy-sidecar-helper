@@ -48,12 +48,10 @@ var httpClient = &http.Client{
 	Timeout: *httpTimeout,
 }
 
-var ctx = context.Background()
-
 var errContainerStillRunning = errors.New("containers still running")
 
 // wait for envoy sidecar to be ready.
-func CheckEnvoyStart() {
+func CheckEnvoyStart(ctx context.Context) {
 	if !*envoyReadyCheck {
 		log.Info("envoy ready check disabled")
 
@@ -63,9 +61,13 @@ func CheckEnvoyStart() {
 	log.Infof("waiting for envoy will be ready %s:%d%s", *envoyHost, *envoyReadyPort, *envoyReadyEndpoint)
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		time.Sleep(*checkDuration)
 
-		if err := makeCall("GET", *envoyHost, *envoyReadyPort, *envoyReadyEndpoint); err != nil {
+		if err := makeCall(ctx, "GET", *envoyHost, *envoyReadyPort, *envoyReadyEndpoint); err != nil {
 			log.WithError(err).Debug()
 		} else {
 			break
@@ -80,7 +82,7 @@ func CheckEnvoyStart() {
 }
 
 // check if container is stoped.
-func IsContainerStoped() (bool, error) {
+func IsContainerStoped(ctx context.Context) (bool, error) {
 	pod, err := client.KubeClient().CoreV1().Pods(*namespace).Get(ctx, *podName, metav1.GetOptions{})
 	if err != nil {
 		return false, errors.Wrap(err, "error getting pod")
@@ -148,13 +150,17 @@ func getTermStates(names []string, pod *v1.Pod) termStates {
 }
 
 // check is watched containers is stopped.
-func CheckContainerStop() {
+func CheckContainerStop(ctx context.Context) {
 	log.Info("waiting for container stop")
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		time.Sleep(*checkDuration)
 
-		stoped, err := IsContainerStoped()
+		stoped, err := IsContainerStoped(ctx)
 		if err != nil {
 			log.WithError(err).Error()
 		}
@@ -164,15 +170,13 @@ func CheckContainerStop() {
 		}
 	}
 
-	if err := makeCall("POST", *envoyHost, *envoyPort, *envoyQuitEndpoint); err != nil {
+	if err := makeCall(ctx, "POST", *envoyHost, *envoyPort, *envoyQuitEndpoint); err != nil {
 		log.WithError(err).Error()
 	}
 }
 
 // make http call to envoy sidecar.
-func makeCall(method string, host string, port int, path string) error {
-	ctx := context.Background()
-
+func makeCall(ctx context.Context, method string, host string, port int, path string) error {
 	url := fmt.Sprintf("%s:%d%s", host, port, path)
 
 	log.Debugf("create request %s, %s", method, url)
