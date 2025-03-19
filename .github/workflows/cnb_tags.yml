@@ -1,0 +1,65 @@
+name: cnb-tags
+on:
+  push:
+    tags:
+      - '*'
+env:
+  version: ${{ github.ref_name }}
+jobs:
+  
+  config-yaml:
+    name: config.yaml
+    runs-on: ubuntu-24.04
+    outputs:
+      config: ${{ steps.config.outputs.config }}
+    steps:
+      - uses: actions/checkout@v4
+      # https://github.com/chrisdickinson/setup-yq/blob/latest/action.yml
+      - uses: chrisdickinson/setup-yq@v1.0.1
+        name: yq=v4.43.1
+        with:
+          yq-version: v4.43.1
+      - name: yq=version
+        run: yq --version
+      
+      - name: jq=1.7
+        uses: dcarbone/install-jq-action@v2
+        with:
+          version: 1.7
+      
+      - name: export=config
+        id: config
+        run: echo "config=$(yq -oj '.' config.yaml | jq -cr)" >> $GITHUB_OUTPUT
+  
+  builds:
+    runs-on: ubuntu-24.04
+    permissions: write-all
+    name: build
+    needs: config-yaml
+    steps:
+      - uses: actions/checkout@v4
+      - name: dagger=0.15.2
+        run: |
+          curl -L https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.15.2 sh
+      
+      # work around other runner's logging out removing credentials
+      # https://github.com/docker/login-action/issues/173#issuecomment-1079688020
+      - name: Set DOCKER_CONFIG
+        run: |
+          id=docker_configs/${RANDOM}
+          mkdir -p $HOME/${id}/.docker
+          echo "DOCKER_CONFIG=$HOME/${id}/.docker" >> $GITHUB_ENV
+      - uses: docker/login-action@v3
+        name: login=ghcr.io
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          logout: false
+      - name: Pack Build
+        uses: dfreilich/pack-action@v2.1.1
+        with:
+          args: |
+            build ${{ fromJSON(needs.config-yaml.outputs.config).cnb.repo }}:${{ env.version }} \
+            --builder ${{ fromJSON(needs.config-yaml.outputs.config).cnb.builder }} \
+            --publish
