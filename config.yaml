@@ -1,3 +1,0 @@
-cnb:
-  repo: ghcr.io/bradfordwagner/envoy-sidecar-helper
-  builder: paketobuildpacks/builder-jammy-tiny
