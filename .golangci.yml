@@ -7,7 +7,10 @@ linters:
   disable:
   - nestif
   - gochecknoglobals
-  - exhaustivestruct
   - varnamelen
-  - gomnd
+  - mnd
   - exhaustruct
+  - depguard
+  - tenv
+  - intrange
+  - copyloopvar
